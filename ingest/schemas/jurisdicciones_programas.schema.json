@@ -1,0 +1,41 @@
+{
+  "name": "jurisdicciones_programas",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "jurisdicciones": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "juri_codigo": { "type": "string" },
+            "juri_nombre": { "type": "string" }
+          },
+          "required": ["juri_codigo", "juri_nombre"]
+        }
+      },
+      "programas": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "prog_codigo": { "type": "string" },
+            "prog_nombre": { "type": "string" },
+            "juri_codigo": { "type": "string" },
+            "prog_vigente": { "type": ["number", "null"] },
+            "prog_preventivo": { "type": ["number", "null"] },
+            "prog_compromiso": { "type": ["number", "null"] },
+            "prog_devengado": { "type": ["number", "null"] },
+            "prog_pagado": { "type": ["number", "null"] }
+          },
+          "required": ["prog_codigo", "prog_nombre", "juri_codigo"]
+        }
+      }
+    },
+    "required": ["jurisdicciones", "programas"]
+  }
+}

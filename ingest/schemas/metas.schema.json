@@ -1,0 +1,40 @@
+{
+  "name": "metas_programas",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "metas": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "meta_codigo": { "type": ["string", "null"] },
+            "meta_nombre": { "type": "string" },
+            "unidad_medida": { "type": ["string", "null"] },
+            "prog_codigo": { "type": ["string", "null"] },
+            "prog_nombre": { "type": ["string", "null"] },
+            "juri_codigo": { "type": ["string", "null"] },
+            "valores": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "periodo": { "type": "string" },
+                  "planificado": { "type": ["number", "null"] },
+                  "ejecutado": { "type": ["number", "null"] }
+                },
+                "required": ["periodo", "planificado", "ejecutado"]
+              }
+            }
+          },
+          "required": ["meta_nombre", "valores"]
+        }
+      }
+    },
+    "required": ["metas"]
+  }
+}
