@@ -451,6 +451,7 @@ if doc_id_sel:
                 supabase, "BD_DocumentosCargados", "ID_DocumentoCargado", [doc_id_sel]
             )
             st.success(f"Documento borrado: {deleted}")
+            st.cache_data.clear()
             st.experimental_rerun()
 else:
     st.info("No hay documento seleccionado para borrar.")
@@ -489,6 +490,7 @@ with st.form("form_documento"):
         result = ingest_pdf(supabase, pdf_bytes, doc_pdf.name, metadata)
         if result["ok"]:
             st.success("Documento creado y PDF subido correctamente.")
+            st.cache_data.clear()
             st.experimental_rerun()
         else:
             st.error(f"Error al crear el documento: {result['error']}")
