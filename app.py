@@ -87,6 +87,7 @@ def guardar_cambios_df(
     df_original: pd.DataFrame,
     df_editado: pd.DataFrame,
     columnas_editables: list,
+    columnas_en_tabla: Optional[List[str]] = None,
 ):
     """
     Compara df_original vs df_editado y hace UPDATE fila por fila según pk_col.
@@ -120,9 +121,12 @@ def guardar_cambios_df(
                 cambios[col] = b
 
         if cambios:
-            pk_val = orig[pk_col]
-            cambios[pk_col] = pk_val
-            rows_to_upsert.append(cambios)
+            # Upsert requiere columnas NOT NULL. Enviamos la fila completa
+            # para evitar que columnas obligatorias queden en NULL.
+            cols_src = columnas_en_tabla or list(df_original.columns)
+            full_row = {col: _sanitize(orig[col]) for col in cols_src if col in df_original.columns}
+            full_row.update(cambios)
+            rows_to_upsert.append(full_row)
 
     if rows_to_upsert:
         supabase.table(tabla).upsert(rows_to_upsert).execute()
@@ -1441,6 +1445,7 @@ with tab_programas:
                     df_original=df_p,
                     df_editado=edited_df_p,
                     columnas_editables=columnas_editables_p_ok,
+                    columnas_en_tabla=[c for c in df_p.columns if c != "Juri_Codigo"],
                 )
                 st.success(f"Cambios guardados en programas. Registros actualizados: {updates}")
                 st.experimental_rerun()
