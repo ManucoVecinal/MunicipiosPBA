@@ -4,6 +4,8 @@ import pandas as pd
 import os
 import time
 from typing import List, Optional
+import httpx
+from postgrest._sync.request_builder import SyncRequestBuilder
 from supabase_client import get_supabase_client
 from postgrest.exceptions import APIError
 from pipeline.ingest_pdf import ingest_pdf
@@ -28,6 +30,34 @@ st.title("Municipios PBA – Navegador de información contable")
 
 # Cliente de Supabase (usa tu supabase_client y secrets.toml con url/key)
 supabase = get_supabase_client()
+
+# -------------------------------------------------
+# RETRIES + CACHE
+# -------------------------------------------------
+_orig_execute = SyncRequestBuilder.execute
+
+def _execute_with_retry(self, *args, **kwargs):
+    retries = 3
+    base_sleep = 0.5
+    last_exc = None
+    for attempt in range(retries):
+        try:
+            return _orig_execute(self, *args, **kwargs)
+        except (httpx.ReadError, httpx.ConnectError, httpx.ReadTimeout) as exc:
+            last_exc = exc
+            time.sleep(base_sleep * (2 ** attempt))
+    raise last_exc
+
+SyncRequestBuilder.execute = _execute_with_retry
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_select(table: str, filters: Optional[dict] = None):
+    q = supabase.table(table).select("*")
+    if filters:
+        for k, v in filters.items():
+            q = q.eq(k, v)
+    res = q.execute()
+    return res.data if res.data else []
 
 # -------------------------------------------------
 # HELPERS (sanitizar + guardar cambios)
@@ -71,7 +101,7 @@ def guardar_cambios_df(
         st.warning("No hay columnas editables disponibles en el dataframe.")
         return 0
 
-    updates = 0
+    rows_to_upsert = []
     for i in range(len(df_original)):
         orig = df_original.iloc[i]
         edit = df_editado.iloc[i]
@@ -85,10 +115,14 @@ def guardar_cambios_df(
 
         if cambios:
             pk_val = orig[pk_col]
-            supabase.table(tabla).update(cambios).eq(pk_col, pk_val).execute()
-            updates += 1
+            cambios[pk_col] = pk_val
+            rows_to_upsert.append(cambios)
 
-    return updates
+    if rows_to_upsert:
+        supabase.table(tabla).upsert(rows_to_upsert).execute()
+        st.cache_data.clear()
+
+    return len(rows_to_upsert)
 
 
 def _make_editor(df: pd.DataFrame, columnas_editables: list, key: str):
@@ -235,8 +269,7 @@ if st.sidebar.button("Cerrar sesión"):
 # -------------------------------------------------
 # 1) LISTADO Y SELECCIÓN DE MUNICIPIO
 # -------------------------------------------------
-res_munis = supabase.table("bd_municipios").select("*").execute()
-municipios = res_munis.data if res_munis.data else []
+municipios = _cached_select("bd_municipios")
 
 if not municipios:
     st.info("Todavía no hay municipios cargados en la tabla bd_municipios.")
@@ -353,13 +386,7 @@ with cols_links[2]:
 st.markdown("---")
 st.subheader("Documentos cargados para este municipio")
 
-res_docs = (
-    supabase.table("BD_DocumentosCargados")
-    .select("*")
-    .eq("ID_Municipio", id_muni_sel)
-    .execute()
-)
-documentos = res_docs.data if res_docs.data else []
+documentos = _cached_select("BD_DocumentosCargados", {"ID_Municipio": id_muni_sel})
 
 doc_id_sel = st.session_state.get("documento_seleccionado_id", None)
 
