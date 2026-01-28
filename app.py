@@ -5,7 +5,13 @@ import os
 import time
 from typing import List, Optional
 import httpx
-from postgrest._sync.request_builder import SyncRequestBuilder
+try:
+    from postgrest._sync.request_builder import SyncRequestBuilder as _RequestBuilder
+except Exception:
+    try:
+        from postgrest._sync.request_builder import RequestBuilder as _RequestBuilder
+    except Exception:
+        _RequestBuilder = None
 from supabase_client import get_supabase_client
 from postgrest.exceptions import APIError
 from pipeline.ingest_pdf import ingest_pdf
@@ -34,8 +40,6 @@ supabase = get_supabase_client()
 # -------------------------------------------------
 # RETRIES + CACHE
 # -------------------------------------------------
-_orig_execute = SyncRequestBuilder.execute
-
 def _execute_with_retry(self, *args, **kwargs):
     retries = 3
     base_sleep = 0.5
@@ -48,7 +52,9 @@ def _execute_with_retry(self, *args, **kwargs):
             time.sleep(base_sleep * (2 ** attempt))
     raise last_exc
 
-SyncRequestBuilder.execute = _execute_with_retry
+if _RequestBuilder is not None and hasattr(_RequestBuilder, "execute"):
+    _orig_execute = _RequestBuilder.execute
+    _RequestBuilder.execute = _execute_with_retry
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _cached_select(table: str, filters: Optional[dict] = None):
